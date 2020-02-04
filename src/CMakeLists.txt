@@ -4,7 +4,8 @@
 # commodity libraries
 # consider -fvisibility=hidden
 # Proper object library type was only introduced with CMake 2.8.8
-add_library(r_433 STATIC
+
+set(SOURCES
     abuf.c
     am_analyze.c
     baseband.c
@@ -157,6 +158,10 @@ add_library(r_433 STATIC
     devices/wt450.c
     devices/x10_rf.c
     devices/x10_sec.c
+  )
+
+add_library(r_433 STATIC
+  ${SOURCES}
 )
 
 if("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
@@ -167,11 +172,14 @@ if("${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
 endif()
 
 add_executable(rtl_433 rtl_433.c)
+add_executable(rtl_fuzz rtl_fuzz.c)
 target_link_libraries(rtl_433 r_433)
+target_link_libraries(rtl_fuzz r_433)
 
 if(MSVC)
     # needs CMake 3.1 but Windows builds should have that
     target_sources(rtl_433 PRIVATE getopt/getopt.c)
+    target_sources(rtl_fuzz PRIVATE getopt/getopt.c)
 endif()
 
 add_library(data data.c abuf.c term_ctl.c mongoose.c)
@@ -182,13 +190,19 @@ target_link_libraries(rtl_433
     ${NET_LIBRARIES}
 )
 
+target_link_libraries(rtl_fuzz
+    ${SDR_LIBRARIES}
+    ${NET_LIBRARIES}
+)
+
 set(INSTALL_TARGETS rtl_433)
 if(UNIX)
 target_link_libraries(rtl_433 m)
+target_link_libraries(rtl_fuzz m)
 endif()
 
 # Explicitly say that we want C99
-set_target_properties(rtl_433 r_433 PROPERTIES C_STANDARD 99)
+set_target_properties(rtl_433 r_433 rtl_fuzz PROPERTIES C_STANDARD 99)
 
 ########################################################################
 # Install built library files & utilities
