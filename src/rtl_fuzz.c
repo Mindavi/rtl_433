@@ -38,7 +38,6 @@
 #include "am_analyze.h"
 #include "confparse.h"
 #include "compat_paths.h"
-#include "fatal.h"
 
 #ifdef _WIN32
 #include <io.h>
@@ -59,7 +58,7 @@
 
 static void parse_conf_option(r_cfg_t *cfg, int opt, char *arg);
 
-#define OPTSTRING "vf:g:s:R:G:y:"
+#define OPTSTRING "vf:g:s:R:G"
 
 // these should match the short options exactly
 static struct conf_keywords const conf_keywords[] = {
@@ -69,7 +68,6 @@ static struct conf_keywords const conf_keywords[] = {
         {"sample_rate", 's'},
         {"protocol", 'R'},
         {"register_all", 'G'},
-        {"test_data", 'y'},
         {NULL, 0}};
 
 static void parse_conf_text(r_cfg_t *cfg, char *conf)
@@ -123,15 +121,8 @@ static void parse_conf_option(r_cfg_t *cfg, int opt, char *arg)
             fprintf(stderr, "Max number of frequencies reached %d\n", MAX_FREQS);
         break;
     case 'G':
-        if (atobv(arg, 1) == 4) {
-            fprintf(stderr, "\n\tUse -G for testing only. Enable protocols with -R if you really need them.\n\n");
-            cfg->no_default_devices = 1;
-            register_all_protocols(cfg, 1);
-        }
-        else {
-            fprintf(stderr, "\n\tUse -G for testing only. Enable with -G 4 if you really mean it.\n\n");
-            exit(1);
-        }
+        cfg->no_default_devices = 1;
+        register_all_protocols(cfg, 1);
         break;
     case 's':
         cfg->samp_rate = atouint32_metric(arg, "-s: ");
@@ -167,9 +158,6 @@ static void parse_conf_option(r_cfg_t *cfg, int opt, char *arg)
             fprintf(stderr, "Disabling all device decoders.\n");
             list_clear(&cfg->demod->r_devs, (list_elem_free_fn)free_protocol);
         }
-        break;
-    case 'y':
-        cfg->test_data = arg;
         break;
     default:
         exit(1);
@@ -254,41 +242,12 @@ int main(int argc, char **argv)
         update_protocols(cfg);
     }
 
-    // Special case for streaming test data
-    if (cfg->test_data && (!strcasecmp(cfg->test_data, "-") || *cfg->test_data == '@')) {
-        FILE *fp;
-        char line[INPUT_LINE_MAX];
-
-        if (*cfg->test_data == '@') {
-            fprintf(stderr, "Reading test data from \"%s\"\n", &cfg->test_data[1]);
-            fp = fopen(&cfg->test_data[1], "r");
-        }
-        else {
-            fprintf(stderr, "Reading test data from stdin\n");
-            fp = stdin;
-        }
-        if (!fp) {
-            fprintf(stderr, "Failed to open %s\n", cfg->test_data);
-            return 1;
-        }
-
-        if (fgets(line, INPUT_LINE_MAX, fp)) {
-            r = process_test_data(cfg, demod, line);
-        }
-
-        if (*cfg->test_data == '@') {
-            fclose(fp);
-        }
-
-        r_free_cfg(cfg);
-        return r < 0 ? 1 : 0;
+    // Streaming test data
+    char line[INPUT_LINE_MAX];
+    fprintf(stderr, "Reading test data from stdin\n");
+    if (fgets(line, INPUT_LINE_MAX, stdin)) {
+        r = process_test_data(cfg, demod, line);
     }
-    // Special case for string test data
-    if (cfg->test_data) {
-        r = process_test_data(cfg, demod, cfg->test_data);
-        return r < 0 ? 1 : 0;
-    }
-
-    fprintf(stderr, "sdr mode not supported\n");
-    return 1;
+    r_free_cfg(cfg);
+    return r < 0 ? 1 : 0;
 }
