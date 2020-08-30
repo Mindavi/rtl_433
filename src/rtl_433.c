@@ -1058,6 +1058,8 @@ static void parse_conf_option(r_cfg_t *cfg, int opt, char *arg)
                 cfg->fsk_pulse_detect_mode = FSK_PULSE_DETECT_NEW;
             else if (!strncmp(p, "ampest", 6))
                 cfg->demod->use_mag_est = 0;
+            else if (!strncmp(p, "verbose", 7))
+                cfg->demod->detect_verbosity++;
             else if (!strncmp(p, "magest", 6))
                 cfg->demod->use_mag_est = 1;
             else if (!strncasecmp(p, "level", 5))
@@ -1132,6 +1134,7 @@ static void sighandler(int signum)
     }
     else if (signum == SIGALRM) {
         fprintf(stderr, "Async read stalled, exiting!\n");
+        g_cfg.exit_code = 3;
     }
     else {
         fprintf(stderr, "Signal caught, exiting!\n");
@@ -1195,7 +1198,7 @@ int main(int argc, char **argv) {
         add_infile(cfg, argv[optind++]);
     }
 
-    pulse_detect_set_levels(demod->pulse_detect, demod->use_mag_est, demod->level_limit, demod->min_level, demod->min_snr);
+    pulse_detect_set_levels(demod->pulse_detect, demod->use_mag_est, demod->level_limit, demod->min_level, demod->min_snr, demod->detect_verbosity);
 
     if (demod->am_analyze) {
         demod->am_analyze->level_limit = DB_TO_AMP(demod->level_limit);
@@ -1469,6 +1472,9 @@ int main(int argc, char **argv) {
             }
             demod->sample_file_pos = ((float)n_blocks + 1) * DEFAULT_BUF_LENGTH / cfg->samp_rate / 2 / demod->sample_size;
             sdr_callback(test_mode_buf, DEFAULT_BUF_LENGTH, cfg);
+#ifndef _WIN32
+            alarm(0); // cancel the watchdog timer
+#endif
 
             //Always classify a signal at the end of the file
             if (demod->am_analyze)
@@ -1496,7 +1502,7 @@ int main(int argc, char **argv) {
     // Normal case, no test data, no in files
     r = sdr_open(&cfg->dev, &demod->sample_size, cfg->dev_query, cfg->verbosity);
     if (r < 0) {
-        exit(1);
+        exit(2);
     }
 
 #ifndef _WIN32
@@ -1583,9 +1589,13 @@ int main(int argc, char **argv) {
         flush_report_data(cfg);
     }
 
-    if (!cfg->do_exit)
+    if (!cfg->do_exit) {
         fprintf(stderr, "\nLibrary error %d, exiting...\n", r);
+        cfg->exit_code = r;
+    }
 
+    if (cfg->exit_code >= 0)
+        r = cfg->exit_code;
     r_free_cfg(cfg);
 
     return r >= 0 ? r : -r;

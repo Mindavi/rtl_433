@@ -11,7 +11,7 @@
 */
 /**
 Largely the same as esperanza_ews, kedsum.
-\sa esperanza_ews.c kedsum.c
+@sa esperanza_ews.c kedsum.c
 
 Also NC-5849-913 from Pearl (for FWS-310 station).
 
@@ -74,6 +74,15 @@ static int s3318p_callback(r_device *decoder, bitbuffer_t *bitbuffer) {
     // remove the two leading 0-bits and align the data
     bitbuffer_extract_bytes(bitbuffer, r, 2, b, 40);
 
+    // No need to decode/extract values for simple test
+    // check id channel temperature humidity value not zero
+    if (!b[0] && !b[1] && !b[2] && !b[3]) {
+        if (decoder->verbose > 1) {
+            fprintf(stderr, "%s: DECODE_FAIL_SANITY data all 0x00\n", __func__);
+        }
+        return DECODE_FAIL_SANITY;
+    }
+
     // CRC-4 poly 0x3, init 0x0 over 32 bits then XOR the next 4 bits
     int crc = crc4(b, 4, 0x3, 0x0) ^ (b[4] >> 4);
     if (crc != (b[4] & 0xf))
@@ -82,7 +91,7 @@ static int s3318p_callback(r_device *decoder, bitbuffer_t *bitbuffer) {
     int id          = b[0];
     int channel     = ((b[1] & 0x30) >> 4) + 1;
     int temp_raw    = ((b[2] & 0x0f) << 8) | (b[2] & 0xf0) | (b[1] & 0x0f);
-    float temp_f    = (temp_raw - 900) * 0.1;
+    float temp_f    = (temp_raw - 900) * 0.1f;
     int humidity    = ((b[3] & 0x0f) << 4) | ((b[3] & 0xf0) >> 4);
     int button      = b[4] >> 7;
     int battery_low = (b[4] & 0x40) >> 6;
