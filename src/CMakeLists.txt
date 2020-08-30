@@ -206,7 +206,7 @@ target_link_libraries(rtl_fuzz
     ${NET_LIBRARIES}
 )
 
-set(INSTALL_TARGETS rtl_433)
+set(INSTALL_TARGETS rtl_433 rtl_fuzz)
 if(UNIX)
 target_link_libraries(rtl_433 m)
 target_link_libraries(rtl_fuzz m)
